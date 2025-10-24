@@ -1,0 +1,5 @@
+**/.env
+**/__pycache__
+
+.pytest_cache__
+audio_lib.egg-info

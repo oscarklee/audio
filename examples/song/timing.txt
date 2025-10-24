@@ -1,0 +1,5 @@
+bass.wav 20160
+drums.wav 20180
+guitars.wav 19600
+samples.wav 1190
+vocals.wav 18780
