@@ -17,49 +17,48 @@ class In:
     int16 = np.int16
     float32 = np.float32
 
+    _default_frame_length = int(os.getenv('DEFAULT_AUDIO_IN_FRAME_LENGTH', '1536'))
     _default_selected_device = os.getenv('DEFAULT_AUDIO_IN_DEVICE', 'Wireless Microphone' ) 
-    _default_sample_rate = int(os.getenv('DEFAULT_AUDIO_IN_RATE', '48000'))
-    _default_channels = int(os.getenv('DEFAULT_AUDIO_IN_CHANNELS', '2'))
-    _default_format = float32 if os.getenv('DEFAULT_AUDIO_IN_FORMAT', 'float32') == 'float32' else int16
+    _default_sample_rate = int(os.getenv('DEFAULT_AUDIO_IN_RATE', '16000'))
+    _default_channels = int(os.getenv('DEFAULT_AUDIO_IN_CHANNELS', '1'))
+    _default_format = os.getenv('DEFAULT_AUDIO_IN_FORMAT', 'float32')
     _stream: Optional[sd.InputStream] = None
     
     @classmethod
-    def read(cls, frame_length: int = 512, 
+    def read(cls, callback,
+             frame_length: Optional[int] = None, 
              device: Optional[str] = None,
              sample_rate: Optional[int] = None,
              channels: Optional[int] = None,
-             format: Optional[type] = None) -> NDArray:
+             format: Optional[str] = None):
         """
         Read audio frames from the microphone.
         
         Args:
+            callback: Function to call with audio data
             frame_length: Number of frames to read
             device: Input device name (defaults to DEFAULT_AUDIO_IN_DEVICE)
             sample_rate: Sample rate in Hz (defaults to DEFAULT_AUDIO_IN_RATE)
             channels: Number of audio channels (defaults to DEFAULT_AUDIO_IN_CHANNELS)
             format: Data format (int16 or float32, defaults to DEFAULT_AUDIO_IN_FORMAT)
-            
-        Returns:
-            NDArray: Audio data as numpy array with shape (frame_length, channels)
         """
+        frame_length = frame_length or cls._default_frame_length
         device = device or cls._default_selected_device
         sample_rate = sample_rate or cls._default_sample_rate
         channels = channels or cls._default_channels
         format = format or cls._default_format
-        
         device_index = cls._get_device_index(device)
-        dtype = 'int16' if format == cls.int16 else 'float32'
         
-        audio_data = sd.rec(
-            frames=frame_length,
+        cls._stream = sd.InputStream(
             samplerate=sample_rate,
             channels=channels,
-            dtype=dtype,
+            dtype=format,
             device=device_index,
-            blocking=True
+            blocksize=frame_length,
+            callback=callback
         )
-        
-        return audio_data
+
+        cls._stream.start()
     
     @classmethod
     def _get_device_index(cls, device_name: Optional[str]) -> Optional[int]:
@@ -77,10 +76,12 @@ class In:
             
         devices = sd.query_devices()
         for idx, device_info in enumerate(devices):
-            device_dict = dict(device_info)
-            if device_name.lower() in device_dict['name'].lower():
-                if device_dict['max_input_channels'] > 0:
-                    logging.info(f"Selected audio input device: {device_dict['name']} (index: {idx})")
+            name = str(device_info['name'])  # type: ignore
+            max_input = int(device_info['max_input_channels'])  # type: ignore
+            
+            if device_name.lower() in name.lower():
+                if max_input > 0:
+                    logging.info(f"Selected audio input device: {name} (index: {idx})")
                     return idx
         
         logging.warning(f"Device '{device_name}' not found, using default")

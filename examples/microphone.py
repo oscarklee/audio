@@ -7,6 +7,8 @@ The bar turns red when approaching saturation levels.
 import sys
 import numpy as np
 from audio import In
+import signal
+import threading
 
 
 class Colors:
@@ -85,6 +87,15 @@ def draw_level_bar(level: float, bar_width: int = 50) -> str:
     return f"[{bar}] {color}{level_text}{Colors.RESET}{status}"
 
 
+def audio_callback(indata, frames, time, status):
+    level = get_audio_level(indata)
+    bar = draw_level_bar(level)
+    
+    # Clear line and print bar
+    sys.stdout.write(f"\r{bar}")
+    sys.stdout.flush()
+
+
 def main():
     """Run the real-time microphone level meter."""
     print(f"{Colors.BOLD}🎤 Microphone Level Meter{Colors.RESET}")
@@ -93,21 +104,10 @@ def main():
     print(f"Channels: {In._default_channels}")
     print(f"\nPress Ctrl+C to stop\n")
     
-    try:
-        while True:
-            audio_data = In.read(frame_length=1024)
-            level = get_audio_level(audio_data)
-            bar = draw_level_bar(level)
-            
-            # Clear line and print bar
-            sys.stdout.write(f"\r{bar}")
-            sys.stdout.flush()
-            
-    except KeyboardInterrupt:
-        print(f"\n\n{Colors.GREEN}✓ Stopped gracefully{Colors.RESET}")
-    except Exception as e:
-        print(f"\n\n{Colors.RED}✗ Error: {e}{Colors.RESET}")
-        sys.exit(1)
+    In.read(audio_callback)
+    stop_event = threading.Event()
+    signal.signal(signal.SIGINT, lambda sig, frame: stop_event.set())
+    stop_event.wait()
 
 
 if __name__ == "__main__":
