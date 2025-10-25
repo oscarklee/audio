@@ -1,5 +1,4 @@
 import os
-import atexit
 import logging
 import numpy as np
 
@@ -18,7 +17,7 @@ class In:
     float32 = np.float32
 
     _default_frame_length = int(os.getenv('DEFAULT_AUDIO_IN_FRAME_LENGTH', '1536'))
-    _default_selected_device = os.getenv('DEFAULT_AUDIO_IN_DEVICE', 'Wireless Microphone' ) 
+    _default_selected_device = os.getenv('DEFAULT_AUDIO_IN_DEVICE', 'pulse' ) 
     _default_sample_rate = int(os.getenv('DEFAULT_AUDIO_IN_RATE', '16000'))
     _default_channels = int(os.getenv('DEFAULT_AUDIO_IN_CHANNELS', '1'))
     _default_format = os.getenv('DEFAULT_AUDIO_IN_FORMAT', 'float32')
@@ -55,10 +54,19 @@ class In:
             dtype=format,
             device=device_index,
             blocksize=frame_length,
-            callback=callback
+            callback=callback,
         )
 
         cls._stream.start()
+    
+    @classmethod
+    def stop(cls) -> None:
+        """Cleanup on exit."""
+        if cls._stream is not None:
+            cls._stream.stop()
+            cls._stream.close()
+            cls._stream = None
+        logging.info("Microphone terminated gracefully")
     
     @classmethod
     def _get_device_index(cls, device_name: Optional[str]) -> Optional[int]:
@@ -86,16 +94,3 @@ class In:
         
         logging.warning(f"Device '{device_name}' not found, using default")
         return None
-
-    @classmethod
-    def _cleanup(cls) -> None:
-        """Cleanup on exit."""
-        if cls._stream is not None:
-            cls._stream.stop()
-            cls._stream.close()
-            cls._stream = None
-        logging.info("Microphone terminated gracefully")
-
-
-# Register cleanup function to run on exit
-atexit.register(In._cleanup)

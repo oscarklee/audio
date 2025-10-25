@@ -106,7 +106,14 @@ def main():
     
     In.read(audio_callback)
     stop_event = threading.Event()
-    signal.signal(signal.SIGINT, lambda sig, frame: stop_event.set())
+    
+    def cleanup_handler(sig, frame):
+        print(f"\n{Colors.BOLD}Stopping...{Colors.RESET}")
+        In.stop()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, cleanup_handler)
+    signal.signal(signal.SIGTERM, cleanup_handler)
     stop_event.wait()
 
 
